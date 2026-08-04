@@ -1,0 +1,10 @@
+{
+  "name": "黑马记账",
+  "short_name": "黑马记账",
+  "description": "个人日常记账应用",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f5f5",
+  "theme_color": "#3b82f6",
+  "icons": []
+}

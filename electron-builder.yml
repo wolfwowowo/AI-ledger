@@ -1,0 +1,25 @@
+appId: com.heima.ledger
+productName: 黑马记账
+directories:
+  output: dist
+files:
+  - electron/**/*
+  - server/**/*
+  - out/renderer/**/*
+  - package.json
+  - node_modules/**/*
+extraMetadata:
+  main: electron/main.cjs
+mac:
+  target:
+    - dmg
+  artifactName: ${productName}-${version}-mac.${ext}
+  category: public.app-category.finance
+win:
+  target:
+    - nsis
+  artifactName: ${productName}-${version}-win-setup.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
