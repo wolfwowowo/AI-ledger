@@ -3,11 +3,13 @@ export interface CategoryL1 {
   name: string
   icon: string
   children: CategoryL2[]
+  isSystem?: boolean
 }
 
 export interface CategoryL2 {
   id: number
   name: string
+  isSystem?: boolean
 }
 
 export interface LedgerRecord {
@@ -51,6 +53,33 @@ export const api = {
 
   deleteRecord: (id: number): Promise<{ success: boolean }> =>
     fetch(`${API_BASE}/api/records/${id}`, { method: 'DELETE' }).then(r => r.json()),
+
+  // 分类管理
+  addCategoryL1: (data: { name: string; icon: string }): Promise<{ id: number }> =>
+    fetch(`${API_BASE}/api/categories/l1`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
+    }).then(r => r.json()),
+
+  addCategoryL2: (data: { parentId: number; name: string }): Promise<{ id: number }> =>
+    fetch(`${API_BASE}/api/categories/l2`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
+    }).then(r => r.json()),
+
+  updateCategoryL1: (id: number, name: string): Promise<{ success: boolean }> =>
+    fetch(`${API_BASE}/api/categories/l1/${id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name })
+    }).then(r => r.json()),
+
+  updateCategoryL2: (id: number, name: string): Promise<{ success: boolean }> =>
+    fetch(`${API_BASE}/api/categories/l2/${id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name })
+    }).then(r => r.json()),
+
+  deleteCategoryL1: (id: number): Promise<{ success: boolean }> =>
+    fetch(`${API_BASE}/api/categories/l1/${id}`, { method: 'DELETE' }).then(r => r.json()),
+
+  deleteCategoryL2: (id: number): Promise<{ success: boolean }> =>
+    fetch(`${API_BASE}/api/categories/l2/${id}`, { method: 'DELETE' }).then(r => r.json()),
 
   getSummary: (filters?: { startDate?: string; endDate?: string }): Promise<CategorySummary[]> => {
     const params = new URLSearchParams()

@@ -4,10 +4,10 @@ import { join } from 'path'
 // ========== 数据结构 ==========
 
 interface CategoryL1 {
-  id: number; name: string; icon: string; sort: number; children: CategoryL2[]
+  id: number; name: string; icon: string; sort: number; children: CategoryL2[]; isSystem?: boolean
 }
 interface CategoryL2 {
-  id: number; parentId: number; name: string; sort: number
+  id: number; parentId: number; name: string; sort: number; isSystem?: boolean
 }
 interface Record {
   id: number; amount: number; categoryId: number; date: string; note: string; createdAt: string
@@ -46,9 +46,9 @@ function saveToDisk(): void {
 function seedCategories(): void {
   let l1Id = 1; let l2Id = 1
   for (const cat of DEFAULT_CATEGORIES) {
-    data.categoriesL1.push({ id: l1Id, name: cat.name, icon: cat.icon, sort: l1Id, children: [] })
+    data.categoriesL1.push({ id: l1Id, name: cat.name, icon: cat.icon, sort: l1Id, children: [], isSystem: true })
     for (const childName of cat.children) {
-      data.categoriesL2.push({ id: l2Id, parentId: l1Id, name: childName, sort: l2Id })
+      data.categoriesL2.push({ id: l2Id, parentId: l1Id, name: childName, sort: l2Id, isSystem: true })
       l2Id++
     }
     l1Id++
@@ -58,6 +58,15 @@ function seedCategories(): void {
 export function initStore(): void {
   if (existsSync(DATA_FILE)) {
     data = JSON.parse(readFileSync(DATA_FILE, 'utf-8'))
+    // 旧数据迁移：补上 isSystem 标记
+    let migrated = false
+    for (const cat of data.categoriesL1) {
+      if (cat.isSystem === undefined) { cat.isSystem = true; migrated = true }
+    }
+    for (const cat of data.categoriesL2) {
+      if (cat.isSystem === undefined) { cat.isSystem = true; migrated = true }
+    }
+    if (migrated) saveToDisk()
   } else {
     data = { categoriesL1: [], categoriesL2: [], records: [], nextId: 1 }
     seedCategories()
@@ -66,15 +75,64 @@ export function initStore(): void {
 }
 
 export function getCategories() {
-  const map = new Map<number, { id: number; name: string; icon: string; children: { id: number; name: string }[] }>()
+  const map = new Map<number, { id: number; name: string; icon: string; children: { id: number; name: string; isSystem?: boolean }[]; isSystem?: boolean }>()
   for (const l1 of data.categoriesL1) {
-    map.set(l1.id, { id: l1.id, name: l1.name, icon: l1.icon, children: [] })
+    map.set(l1.id, { id: l1.id, name: l1.name, icon: l1.icon, children: [], isSystem: l1.isSystem })
   }
   for (const l2 of data.categoriesL2) {
     const parent = map.get(l2.parentId)
-    if (parent) parent.children.push({ id: l2.id, name: l2.name })
+    if (parent) parent.children.push({ id: l2.id, name: l2.name, isSystem: l2.isSystem })
   }
   return Array.from(map.values())
+}
+
+// ========== 分类管理 ==========
+
+export function addCategoryL1(name: string, icon: string) {
+  const id = data.categoriesL1.length > 0 ? Math.max(...data.categoriesL1.map(c => c.id)) + 1 : 1
+  data.categoriesL1.push({ id, name, icon, sort: id, children: [], isSystem: false })
+  saveToDisk()
+  return { id }
+}
+
+export function addCategoryL2(parentId: number, name: string) {
+  const parent = data.categoriesL1.find(c => c.id === parentId)
+  if (!parent) throw new Error('一级分类不存在')
+  const id = data.categoriesL2.length > 0 ? Math.max(...data.categoriesL2.map(c => c.id)) + 1 : 1
+  data.categoriesL2.push({ id, parentId, name, sort: id, isSystem: false })
+  saveToDisk()
+  return { id }
+}
+
+export function updateCategoryName(level: 1 | 2, id: number, name: string) {
+  if (level === 1) {
+    const cat = data.categoriesL1.find(c => c.id === id)
+    if (!cat) throw new Error('分类不存在')
+    if (cat.isSystem) throw new Error('不能修改系统分类')
+    cat.name = name
+  } else {
+    const cat = data.categoriesL2.find(c => c.id === id)
+    if (!cat) throw new Error('分类不存在')
+    if (cat.isSystem) throw new Error('不能修改系统分类')
+    cat.name = name
+  }
+  saveToDisk()
+}
+
+export function deleteCategory(level: 1 | 2, id: number) {
+  if (level === 1) {
+    const cat = data.categoriesL1.find(c => c.id === id)
+    if (!cat) throw new Error('分类不存在')
+    if (cat.isSystem) throw new Error('不能删除系统分类')
+    data.categoriesL1 = data.categoriesL1.filter(c => c.id !== id)
+    data.categoriesL2 = data.categoriesL2.filter(c => c.parentId !== id)
+  } else {
+    const cat = data.categoriesL2.find(c => c.id === id)
+    if (!cat) throw new Error('分类不存在')
+    if (cat.isSystem) throw new Error('不能删除系统分类')
+    data.categoriesL2 = data.categoriesL2.filter(c => c.id !== id)
+  }
+  saveToDisk()
 }
 
 export function addRecord(record: { amount: number; categoryId: number; date: string; note?: string }) {

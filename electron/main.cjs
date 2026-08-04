@@ -30,7 +30,26 @@ function createWindow() {
 
   const isDev = !app.isPackaged
   const url = isDev ? 'http://localhost:5173' : 'http://localhost:3456'
-  mainWindow.loadURL(url)
+
+  // 开发模式下 Vite 可能还没就绪，加重试逻辑
+  loadURLWithRetry(url, isDev ? 10 : 1)
+}
+
+async function loadURLWithRetry(url, maxRetries) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      await mainWindow.loadURL(url)
+      console.log(`✅ 页面加载成功: ${url}`)
+      return
+    } catch (err) {
+      if (i < maxRetries - 1) {
+        console.log(`⏳ 等待 Vite 就绪... (${i + 1}/${maxRetries})`)
+        await new Promise(r => setTimeout(r, 1000))
+      } else {
+        console.error(`❌ 无法连接到 ${url}`, err.message)
+      }
+    }
+  }
 }
 
 app.whenReady().then(() => {

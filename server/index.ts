@@ -2,7 +2,7 @@ import express from 'express'
 import cors from 'cors'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { initStore, getCategories, addRecord, getRecords, deleteRecord, getSummary } from './store'
+import { initStore, getCategories, addCategoryL1, addCategoryL2, updateCategoryName, deleteCategory, addRecord, getRecords, deleteRecord, getSummary } from './store'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -21,6 +21,56 @@ initStore()
 // 获取分类
 app.get('/api/categories', (_req, res) => {
   res.json(getCategories())
+})
+
+// 添加一级分类
+app.post('/api/categories/l1', (req, res) => {
+  try {
+    const { name, icon } = req.body
+    if (!name || !icon) return res.status(400).json({ error: '缺少名称或图标' })
+    res.json(addCategoryL1(name, icon))
+  } catch (e: any) { res.status(400).json({ error: e.message }) }
+})
+
+// 添加二级分类
+app.post('/api/categories/l2', (req, res) => {
+  try {
+    const { parentId, name } = req.body
+    if (!parentId || !name) return res.status(400).json({ error: '缺少父分类或名称' })
+    res.json(addCategoryL2(parentId, name))
+  } catch (e: any) { res.status(400).json({ error: e.message }) }
+})
+
+// 修改一级分类名
+app.put('/api/categories/l1/:id', (req, res) => {
+  try {
+    updateCategoryName(1, parseInt(req.params.id), req.body.name)
+    res.json({ success: true })
+  } catch (e: any) { res.status(400).json({ error: e.message }) }
+})
+
+// 修改二级分类名
+app.put('/api/categories/l2/:id', (req, res) => {
+  try {
+    updateCategoryName(2, parseInt(req.params.id), req.body.name)
+    res.json({ success: true })
+  } catch (e: any) { res.status(400).json({ error: e.message }) }
+})
+
+// 删除一级分类（含其二级）
+app.delete('/api/categories/l1/:id', (req, res) => {
+  try {
+    deleteCategory(1, parseInt(req.params.id))
+    res.json({ success: true })
+  } catch (e: any) { res.status(400).json({ error: e.message }) }
+})
+
+// 删除二级分类
+app.delete('/api/categories/l2/:id', (req, res) => {
+  try {
+    deleteCategory(2, parseInt(req.params.id))
+    res.json({ success: true })
+  } catch (e: any) { res.status(400).json({ error: e.message }) }
 })
 
 // 添加记录

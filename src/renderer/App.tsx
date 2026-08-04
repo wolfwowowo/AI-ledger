@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { CategoryL1, LedgerRecord, api } from './types'
 
 function App() {
-  const [currentTab, setCurrentTab] = useState<'add' | 'list' | 'stats'>('add')
+  const [currentTab, setCurrentTab] = useState<'add' | 'list' | 'stats' | 'settings'>('add')
 
   // 记账表单状态
   const [categories, setCategories] = useState<CategoryL1[]>([])
@@ -18,6 +18,11 @@ function App() {
 
   // 加载分类
   useEffect(() => {
+    api.getCategories().then(setCategories)
+  }, [])
+
+  // 给设置页用的刷新分类函数
+  const refreshCategories = useCallback(() => {
     api.getCategories().then(setCategories)
   }, [])
 
@@ -224,6 +229,11 @@ function App() {
         {currentTab === 'stats' && (
           <StatsView categories={categories} />
         )}
+
+        {/* Tab 4: 设置 */}
+        {currentTab === 'settings' && (
+          <SettingsView categories={categories} onRefresh={refreshCategories} />
+        )}
       </div>
 
       {/* 底部导航 */}
@@ -231,7 +241,8 @@ function App() {
         {[
           { key: 'add', label: '记一笔', icon: '✏️' },
           { key: 'list', label: '明细', icon: '📋' },
-          { key: 'stats', label: '统计', icon: '📊' }
+          { key: 'stats', label: '统计', icon: '📊' },
+          { key: 'settings', label: '设置', icon: '⚙️' }
         ].map(tab => (
           <button
             key={tab.key}
@@ -304,6 +315,234 @@ function StatsView({ categories: _categories }: { categories: CategoryL1[] }) {
               <span className="font-medium text-gray-800">¥{s.total.toFixed(2)}</span>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ========== 设置页面 ==========
+
+const EMOJI_LIST = ['🍽️','🚗','🛍️','🏠','🎮','🏥','📚','💰','📌','🎵','✈️','🐱','💻','🎁','☕','🏃','💄','📱','🎓','💼']
+
+function SettingsView({ categories, onRefresh }: { categories: CategoryL1[]; onRefresh: () => void }) {
+  const [modal, setModal] = useState<null | { type: 'addL1' } | { type: 'addL2'; parentId: number } | { type: 'editL1'; id: number; name: string } | { type: 'editL2'; id: number; name: string }>(null)
+  const [modalName, setModalName] = useState('')
+  const [modalIcon, setModalIcon] = useState('📌')
+  const [expandedL1, setExpandedL1] = useState<Set<number>>(new Set())
+
+  const systemL1 = categories.filter(c => c.isSystem)
+  // 用户自建一级分类 + 系统一级下的用户自建二级分类
+  const userL1 = categories.filter(c => !c.isSystem)
+
+  const openAddL1 = () => { setModal({ type: 'addL1' }); setModalName(''); setModalIcon('📌') }
+  const openAddL2 = (parentId: number) => { setModal({ type: 'addL2', parentId }); setModalName('') }
+  const openEditL1 = (id: number, name: string) => { setModal({ type: 'editL1', id, name }); setModalName(name) }
+  const openEditL2 = (id: number, name: string) => { setModal({ type: 'editL2', id, name }); setModalName(name) }
+
+  const handleSubmit = async () => {
+    if (!modalName.trim()) return
+    try {
+      if (modal!.type === 'addL1') await api.addCategoryL1({ name: modalName.trim(), icon: modalIcon })
+      else if (modal!.type === 'addL2') await api.addCategoryL2({ parentId: modal!.parentId, name: modalName.trim() })
+      else if (modal!.type === 'editL1') await api.updateCategoryL1(modal!.id, modalName.trim())
+      else if (modal!.type === 'editL2') await api.updateCategoryL2(modal!.id, modalName.trim())
+      setModal(null)
+      onRefresh()
+    } catch (e: any) {
+      alert('操作失败: ' + (e.message || '未知错误'))
+    }
+  }
+
+  const handleDeleteL1 = async (id: number, name: string) => {
+    if (!confirm(`确定删除一级分类「${name}」及其所有二级分类吗？\n已记录的账目不受影响。`)) return
+    try { await api.deleteCategoryL1(id); onRefresh() }
+    catch (e: any) { alert('删除失败: ' + (e.message || '未知错误')) }
+  }
+
+  const handleDeleteL2 = async (id: number, name: string) => {
+    if (!confirm(`确定删除二级分类「${name}」吗？`)) return
+    try { await api.deleteCategoryL2(id); onRefresh() }
+    catch (e: any) { alert('删除失败: ' + (e.message || '未知错误')) }
+  }
+
+  const toggleExpand = (id: number) => {
+    setExpandedL1(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
+  }
+
+  return (
+    <div className="max-w-sm mx-auto space-y-4">
+      {/* 系统分类 */}
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
+          <span>🔒</span>
+          <span className="text-sm font-medium text-gray-600">系统分类</span>
+          <span className="text-xs text-gray-400">一级不可改，可添子分类</span>
+        </div>
+        <div className="divide-y divide-gray-50">
+          {systemL1.map(cat => (
+            <div key={cat.id}>
+              <button
+                onClick={() => toggleExpand(cat.id)}
+                className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-xl">{cat.icon}</span>
+                  <span className="text-sm text-gray-700">{cat.name}</span>
+                  <span className="text-xs text-gray-300">{cat.children.length}个子分类</span>
+                </div>
+                <span className="text-gray-300 text-xs">{expandedL1.has(cat.id) ? '▼' : '▶'}</span>
+              </button>
+              {expandedL1.has(cat.id) && (
+                <div className="bg-gray-50/50 px-4 py-2">
+                  {cat.children.map(child => (
+                    <div key={child.id} className="flex items-center justify-between py-1.5 pl-8">
+                      <span className="text-sm text-gray-500">{child.name}</span>
+                      {child.isSystem ? (
+                        <span className="text-xs text-gray-300">🔒</span>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => openEditL2(child.id, child.name)} className="text-blue-400 hover:text-blue-600 text-xs">✏️</button>
+                          <button onClick={() => handleDeleteL2(child.id, child.name)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => openAddL2(cat.id)}
+                    className="w-full text-center py-1.5 pl-8 text-xs text-blue-500 hover:text-blue-600"
+                  >
+                    + 添加二级分类
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 我的分类 */}
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="px-4 py-3 bg-yellow-50 border-b border-yellow-100 flex items-center gap-2">
+          <span>✏️</span>
+          <span className="text-sm font-medium text-yellow-700">我的分类</span>
+          <span className="text-xs text-yellow-500">可编辑</span>
+        </div>
+        <div className="divide-y divide-gray-50">
+          {userL1.length === 0 ? (
+            <div className="px-4 py-6 text-center text-sm text-gray-400">
+              还没有自定义分类，点击下方按钮添加
+            </div>
+          ) : (
+            userL1.map(cat => (
+              <div key={cat.id}>
+                <button
+                  onClick={() => toggleExpand(cat.id)}
+                  className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-xl">{cat.icon}</span>
+                    <span className="text-sm text-gray-700">{cat.name}</span>
+                    <span className="text-xs text-gray-300">{cat.children.length}个子分类</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-300 text-xs">{expandedL1.has(cat.id) ? '▼' : '▶'}</span>
+                    <button
+                      onClick={e => { e.stopPropagation(); openEditL1(cat.id, cat.name) }}
+                      className="text-blue-400 hover:text-blue-600 text-sm"
+                    >✏️</button>
+                    <button
+                      onClick={e => { e.stopPropagation(); handleDeleteL1(cat.id, cat.name) }}
+                      className="text-red-400 hover:text-red-600 text-sm"
+                    >🗑️</button>
+                  </div>
+                </button>
+                {expandedL1.has(cat.id) && (
+                  <div className="bg-gray-50/50 px-4 py-2">
+                    {cat.children.map(child => (
+                      <div key={child.id} className="flex items-center justify-between py-1.5 pl-8">
+                        <span className="text-sm text-gray-500">{child.name}</span>
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => openEditL2(child.id, child.name)} className="text-blue-400 hover:text-blue-600 text-xs">✏️</button>
+                          <button onClick={() => handleDeleteL2(child.id, child.name)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+                        </div>
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => openAddL2(cat.id)}
+                      className="w-full text-center py-1.5 pl-8 text-xs text-blue-500 hover:text-blue-600"
+                    >
+                      + 添加二级分类
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* 添加一级分类按钮 */}
+      <button
+        onClick={openAddL1}
+        className="w-full py-3 rounded-xl border-2 border-dashed border-blue-300 text-blue-500 font-medium text-sm hover:bg-blue-50 transition-colors"
+      >
+        + 添加一级分类
+      </button>
+
+      {/* ========== 弹窗 ========== */}
+      {modal && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setModal(null)}>
+          <div className="bg-white rounded-2xl p-5 w-72 shadow-xl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-base font-bold text-gray-800 mb-4">
+              {modal.type === 'addL1' && '添加一级分类'}
+              {modal.type === 'addL2' && '添加二级分类'}
+              {modal.type === 'editL1' && '修改一级分类名'}
+              {modal.type === 'editL2' && '修改二级分类名'}
+            </h3>
+
+            {/* Emoji 选择 (仅一级分类) */}
+            {(modal.type === 'addL1') && (
+              <div className="mb-3">
+                <label className="text-xs text-gray-500 mb-1 block">选择图标</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {EMOJI_LIST.map(emoji => (
+                    <button
+                      key={emoji}
+                      onClick={() => setModalIcon(emoji)}
+                      className={`w-8 h-8 flex items-center justify-center rounded-lg text-lg ${
+                        modalIcon === emoji ? 'bg-blue-100 ring-2 ring-blue-400' : 'bg-gray-100 hover:bg-gray-200'
+                      }`}
+                    >{emoji}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 名称输入 */}
+            <div className="mb-4">
+              <label className="text-xs text-gray-500 mb-1 block">
+                {modal.type === 'addL1' || modal.type === 'addL2' ? '分类名称' : '新名称'}
+              </label>
+              <input
+                type="text"
+                value={modalName}
+                onChange={e => setModalName(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleSubmit() }}
+                placeholder={modal.type === 'addL1' ? '例如：宠物' : '例如：猫粮'}
+                autoFocus
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none focus:border-blue-500 text-sm"
+              />
+            </div>
+
+            {/* 按钮 */}
+            <div className="flex gap-2">
+              <button onClick={() => setModal(null)} className="flex-1 py-2 rounded-lg border border-gray-200 text-gray-500 text-sm hover:bg-gray-50">取消</button>
+              <button onClick={handleSubmit} disabled={!modalName.trim()} className={`flex-1 py-2 rounded-lg text-white text-sm font-medium ${
+                modalName.trim() ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'
+              }`}>确定</button>
+            </div>
+          </div>
         </div>
       )}
     </div>
