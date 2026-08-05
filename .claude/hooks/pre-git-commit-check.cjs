@@ -4,16 +4,12 @@
  * 拦截 git commit 命令，检查标记文件：
  * - .claude/.test-result.json
  * - .claude/.quality-result.json
- *
- * stdin 输入格式: { "tool_name": "Bash", "tool_input": { "command": "..." } }
- * stdout 输出格式: { "continue": false, "hookSpecificOutput": { "permissionDecision": "deny" } }
  */
 
 const fs = require('fs');
 const path = require('path');
 
-// === 同步读取 stdin ===
-// stdin 可能是 pipe（hook 调用）或 TTY（手动测试），判断后再读
+// === 读取 stdin ===
 let rawInput = '';
 if (!process.stdin.isTTY) {
   rawInput = fs.readFileSync(0, 'utf8').trim();
@@ -22,7 +18,7 @@ if (!process.stdin.isTTY) {
 let toolInput = {};
 try { toolInput = JSON.parse(rawInput || '{}'); } catch (_) {}
 
-// 兼容：也支持 argv[2]（方便手动 pipe 测试）
+// 兼容 argv[2]（方便手动 pipe 测试）
 if (!toolInput.tool_name && process.argv[2]) {
   try {
     const arg = JSON.parse(process.argv[2]);
@@ -76,15 +72,7 @@ if (!testResult || !qualityResult) {
   const missing = [];
   if (!testResult) missing.push('单元测试标记 (.test-result.json)');
   if (!qualityResult) missing.push('质量检查标记 (.quality-result.json)');
-
-  deny([
-    '⛔ 提交被拦截：缺少检查标记文件',
-    '',
-    ...missing.map(f => '  ✗ ' + f),
-    '',
-    '请通过 gitcommit-agent 生成检查标记：',
-    '  输入 "提交代码" 自动运行测试+质量检查',
-  ].join('\n'));
+  deny(['⛔ 提交被拦截：缺少检查标记文件', '', ...missing.map(f => '  ✗ ' + f), '', '输入 "提交代码" 自动运行测试+质量检查'].join('\n'));
 }
 
 // === 检查 2: 标记未过期 ===
@@ -95,26 +83,12 @@ if (testResult.gitHead !== currentHead || qualityResult.gitHead !== currentHead)
 // === 检查 3: 测试通过 ===
 if (!testResult.passed) {
   const fails = (testResult.failures || []).map(f => '  ✗ ' + f.name);
-  deny([
-    '⛔ 提交被拦截：单元测试未通过',
-    '',
-    `  通过: ${testResult.passedCount}/${testResult.total}  失败: ${testResult.failed}/${testResult.total}`,
-    ...fails,
-    '',
-    '请修复后重新运行 gitcommit-agent。',
-  ].join('\n'));
+  deny(['⛔ 提交被拦截：单元测试未通过', '', `  通过: ${testResult.passedCount}/${testResult.total}  失败: ${testResult.failed}/${testResult.total}`, ...fails, '', '请修复后重新运行 gitcommit-agent。'].join('\n'));
 }
 
 // === 检查 4: 质量达标 ===
 if (!qualityResult.passed) {
-  deny([
-    '⛔ 提交被拦截：质量检查未达标',
-    '',
-    `  总分: ${qualityResult.score}/10（需 ≥ 6）`,
-    `  高危: ${qualityResult.highRiskCount} 个（需 0 个）`,
-    '',
-    '请修复后重新运行 gitcommit-agent。',
-  ].join('\n'));
+  deny(['⛔ 提交被拦截：质量检查未达标', '', `  总分: ${qualityResult.score}/10（需 ≥ 6）`, `  高危: ${qualityResult.highRiskCount} 个（需 0 个）`, '', '请修复后重新运行 gitcommit-agent。'].join('\n'));
 }
 
 // === 全部通过 ===
