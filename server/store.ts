@@ -166,7 +166,7 @@ export function getRecords(filters?: { startDate?: string; endDate?: string; cat
     const l1 = l2 ? l1Map.get(l2.parentId) : null
     return {
       id: r.id, amount: r.amount, date: r.date, note: r.note, category_id: r.categoryId,
-      categoryName: l2?.name || '', parentCategoryName: l1?.name || '', parentCategoryIcon: l1?.icon || ''
+      categoryName: l2?.name || '(已删除)', parentCategoryName: l1?.name || '(已删除)', parentCategoryIcon: l1?.icon || '🗑️'
     }
   })
 }
@@ -186,11 +186,19 @@ export function getSummary(filters?: { startDate?: string; endDate?: string }) {
   for (const l1 of data.categoriesL1) {
     summary.set(l1.id, { categoryId: l1.id, categoryName: l1.name, categoryIcon: l1.icon, total: 0 })
   }
+  // 兜底桶：已删除分类的记录
+  summary.set(-1, { categoryId: -1, categoryName: '已删除', categoryIcon: '🗑️', total: 0 })
   for (const r of data.records) {
     if (filters?.startDate && r.date < filters.startDate) continue
     if (filters?.endDate && r.date > filters.endDate) continue
     const l1 = l2ToL1.get(r.categoryId)
-    if (l1 && summary.has(l1.id)) summary.get(l1.id)!.total += r.amount
+    if (l1) {
+      if (summary.has(l1.id)) summary.get(l1.id)!.total += r.amount
+    } else {
+      // 已删除分类的记录归入兜底桶
+      const bucket = summary.get(-1)!
+      bucket.total += r.amount
+    }
   }
-  return Array.from(summary.values()).sort((a, b) => b.total - a.total)
+  return Array.from(summary.values()).filter(s => s.total > 0).sort((a, b) => b.total - a.total)
 }

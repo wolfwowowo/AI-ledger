@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { CategoryL1, LedgerRecord, api } from './types'
+import SnakeGame from './SnakeGame'
 
 function App() {
-  const [currentTab, setCurrentTab] = useState<'add' | 'list' | 'stats' | 'settings'>('add')
+  const [currentTab, setCurrentTab] = useState<'add' | 'list' | 'stats' | 'settings' | 'game'>('add')
 
   // 记账表单状态
   const [categories, setCategories] = useState<CategoryL1[]>([])
@@ -234,6 +235,9 @@ function App() {
         {currentTab === 'settings' && (
           <SettingsView categories={categories} onRefresh={refreshCategories} />
         )}
+
+        {/* Tab 5: 贪吃蛇 */}
+        {currentTab === 'game' && <SnakeGame />}
       </div>
 
       {/* 底部导航 */}
@@ -242,7 +246,8 @@ function App() {
           { key: 'add', label: '记一笔', icon: '✏️' },
           { key: 'list', label: '明细', icon: '📋' },
           { key: 'stats', label: '统计', icon: '📊' },
-          { key: 'settings', label: '设置', icon: '⚙️' }
+          { key: 'settings', label: '设置', icon: '⚙️' },
+          { key: 'game', label: '游戏', icon: '🐍' }
         ].map(tab => (
           <button
             key={tab.key}
@@ -330,6 +335,7 @@ function SettingsView({ categories, onRefresh }: { categories: CategoryL1[]; onR
   const [modalName, setModalName] = useState('')
   const [modalIcon, setModalIcon] = useState('📌')
   const [expandedL1, setExpandedL1] = useState<Set<number>>(new Set())
+  const [submitting, setSubmitting] = useState(false)
 
   const systemL1 = categories.filter(c => c.isSystem)
   // 用户自建一级分类 + 系统一级下的用户自建二级分类
@@ -341,7 +347,8 @@ function SettingsView({ categories, onRefresh }: { categories: CategoryL1[]; onR
   const openEditL2 = (id: number, name: string) => { setModal({ type: 'editL2', id, name }); setModalName(name) }
 
   const handleSubmit = async () => {
-    if (!modalName.trim()) return
+    if (!modalName.trim() || submitting) return
+    setSubmitting(true)
     try {
       if (modal!.type === 'addL1') await api.addCategoryL1({ name: modalName.trim(), icon: modalIcon })
       else if (modal!.type === 'addL2') await api.addCategoryL2({ parentId: modal!.parentId, name: modalName.trim() })
@@ -351,6 +358,8 @@ function SettingsView({ categories, onRefresh }: { categories: CategoryL1[]; onR
       onRefresh()
     } catch (e: any) {
       alert('操作失败: ' + (e.message || '未知错误'))
+    } finally {
+      setSubmitting(false)
     }
   }
 

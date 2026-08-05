@@ -44,7 +44,9 @@ app.post('/api/categories/l2', (req, res) => {
 // 修改一级分类名
 app.put('/api/categories/l1/:id', (req, res) => {
   try {
-    updateCategoryName(1, parseInt(req.params.id), req.body.name)
+    const { name } = req.body
+    if (!name || !name.trim()) return res.status(400).json({ error: '缺少分类名称' })
+    updateCategoryName(1, parseInt(req.params.id), name.trim())
     res.json({ success: true })
   } catch (e: any) { res.status(400).json({ error: e.message }) }
 })
@@ -52,7 +54,9 @@ app.put('/api/categories/l1/:id', (req, res) => {
 // 修改二级分类名
 app.put('/api/categories/l2/:id', (req, res) => {
   try {
-    updateCategoryName(2, parseInt(req.params.id), req.body.name)
+    const { name } = req.body
+    if (!name || !name.trim()) return res.status(400).json({ error: '缺少分类名称' })
+    updateCategoryName(2, parseInt(req.params.id), name.trim())
     res.json({ success: true })
   } catch (e: any) { res.status(400).json({ error: e.message }) }
 })
