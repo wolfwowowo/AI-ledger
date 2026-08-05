@@ -29,7 +29,7 @@ if (!toolInput.tool_name && process.argv[2]) {
 const command = ((toolInput.tool_input || {}).command || '').trim();
 
 // 只拦截 git commit
-if (!/^git commit\b/.test(command)) {
+if (!/git commit\b/.test(command)) {
   console.log(JSON.stringify({ continue: true }));
   process.exit(0);
 }

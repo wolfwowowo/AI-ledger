@@ -24,8 +24,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node /Users/jessica/Agent/ledger/.claude/hooks/pre-git-commit-check.cjs",
-            "if": "Bash(git commit *)"
+            "command": "node /Users/jessica/Agent/ledger/.claude/hooks/pre-git-commit-check.cjs"
           }
         ]
       }
