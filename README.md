@@ -1,2 +1,2 @@
 # AI-ledger
-vibingcode study 黑马编程
+vibingcode study 黑马记账
