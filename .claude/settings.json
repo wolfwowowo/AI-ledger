@@ -16,5 +16,18 @@
     "additionalDirectories": [
       "/Users/jessica/Agent/ledger/.claude/skills"
     ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node /Users/jessica/Agent/ledger/.claude/hooks/pre-git-commit-check.cjs"
+          }
+        ]
+      }
+    ]
   }
 }

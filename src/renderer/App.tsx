@@ -2,6 +2,24 @@ import { useState, useEffect, useCallback } from 'react'
 import { CategoryL1, LedgerRecord, api } from './types'
 import SnakeGame from './SnakeGame'
 
+/**
+ * 获取今天的日期字符串，格式 YYYY-MM-DD。
+ * 提取为工具函数，避免在多处重复 `new Date().toISOString().split('T')[0]`。
+ */
+function getTodayDateString(): string {
+  return new Date().toISOString().split('T')[0]
+}
+
+/**
+ * 黑马记账的主应用组件。
+ *
+ * 包含 5 个底部 Tab 页面：
+ * - 记一笔（添加花销记录）
+ * - 明细（查看历史记录，支持按分类筛选）
+ * - 统计（按月查看各分类支出汇总）
+ * - 设置（管理自定义分类）
+ * - 游戏（贪吃蛇小游戏）
+ */
 function App() {
   const [currentTab, setCurrentTab] = useState<'add' | 'list' | 'stats' | 'settings' | 'game'>('add')
 
@@ -10,59 +28,75 @@ function App() {
   const [selectedL1, setSelectedL1] = useState<CategoryL1 | null>(null)
   const [amount, setAmount] = useState('')
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null)
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+  const [date, setDate] = useState(getTodayDateString())
   const [note, setNote] = useState('')
 
   // 记录列表状态
   const [records, setRecords] = useState<LedgerRecord[]>([])
   const [filterL1Id, setFilterL1Id] = useState<number | null>(null)
 
-  // 加载分类
+  // 加载分类：失败时给用户提示
   useEffect(() => {
-    api.getCategories().then(setCategories)
+    api.getCategories().then(setCategories).catch(() => {
+      alert('加载分类失败，请检查服务是否已启动')
+    })
   }, [])
 
   // 给设置页用的刷新分类函数
   const refreshCategories = useCallback(() => {
-    api.getCategories().then(setCategories)
+    api.getCategories().then(setCategories).catch(() => {
+      alert('刷新分类失败')
+    })
   }, [])
 
   // 加载记录
   const loadRecords = useCallback(() => {
-    const filters: any = {}
+    const filters: { categoryId?: number } = {}
     if (filterL1Id) filters.categoryId = filterL1Id
-    api.getRecords(filters).then(setRecords)
+    api.getRecords(filters).then(setRecords).catch(() => {
+      alert('加载记录失败')
+    })
   }, [filterL1Id])
 
   useEffect(() => {
     if (currentTab === 'list') loadRecords()
   }, [currentTab, loadRecords])
 
-  // 提交记录
+  // 提交记录：用 try-catch 捕获异常，确保用户知道操作结果
   const handleSubmit = async () => {
     if (!amount || !selectedCategoryId) return
     const numAmount = parseFloat(amount)
     if (isNaN(numAmount) || numAmount <= 0) return
 
-    await api.addRecord({
-      amount: numAmount,
-      categoryId: selectedCategoryId,
-      date,
-      note
-    })
+    try {
+      await api.addRecord({
+        amount: numAmount,
+        categoryId: selectedCategoryId,
+        date,
+        note
+      })
 
-    // 重置表单
-    setAmount('')
-    setSelectedCategoryId(null)
-    setSelectedL1(null)
-    setDate(new Date().toISOString().split('T')[0])
-    setNote('')
+      // 重置表单
+      setAmount('')
+      setSelectedCategoryId(null)
+      setSelectedL1(null)
+      setDate(getTodayDateString())
+      setNote('')
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : '未知错误'
+      alert('记账失败: ' + message)
+    }
   }
 
-  // 删除记录
+  // 删除记录：确认后删除并刷新列表
   const handleDelete = async (id: number) => {
-    await api.deleteRecord(id)
-    loadRecords()
+    try {
+      await api.deleteRecord(id)
+      loadRecords()
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : '未知错误'
+      alert('删除失败: ' + message)
+    }
   }
 
   return (
@@ -228,7 +262,7 @@ function App() {
 
         {/* Tab 3: 统计 */}
         {currentTab === 'stats' && (
-          <StatsView categories={categories} />
+          <StatsView />
         )}
 
         {/* Tab 4: 设置 */}
@@ -265,8 +299,15 @@ function App() {
   )
 }
 
-// 统计页面
-function StatsView({ categories: _categories }: { categories: CategoryL1[] }) {
+/**
+ * 统计页面组件。
+ *
+ * 展示当月各分类的支出汇总数据：
+ * - 月份选择器，支持切换查看不同月份
+ * - 当月总支出金额
+ * - 每个分类的支出金额和占比
+ */
+function StatsView() {
   const [summaries, setSummaries] = useState<{ categoryId: number; categoryName: string; categoryIcon: string; total: number }[]>([])
 
   const [month, setMonth] = useState(() => {
@@ -277,10 +318,12 @@ function StatsView({ categories: _categories }: { categories: CategoryL1[] }) {
   useEffect(() => {
     const [year, m] = month.split('-')
     const startDate = `${year}-${m}-01`
-    // 计算当月最后一天
-    const lastDay = new Date(parseInt(year), parseInt(m), 0).getDate()
+    // 计算当月最后一天：下个月的第 0 天就是本月最后一天
+    const lastDay = new Date(parseInt(year, 10), parseInt(m, 10), 0).getDate()
     const endDate = `${year}-${m}-${String(lastDay).padStart(2, '0')}`
-    api.getSummary({ startDate, endDate }).then(setSummaries)
+    api.getSummary({ startDate, endDate }).then(setSummaries).catch(() => {
+      alert('加载统计数据失败')
+    })
   }, [month])
 
   const total = summaries.reduce((sum, s) => sum + s.total, 0)
@@ -328,8 +371,18 @@ function StatsView({ categories: _categories }: { categories: CategoryL1[] }) {
 
 // ========== 设置页面 ==========
 
+/** 用户可以选择的一级分类 emoji 图标列表 */
 const EMOJI_LIST = ['🍽️','🚗','🛍️','🏠','🎮','🏥','📚','💰','📌','🎵','✈️','🐱','💻','🎁','☕','🏃','💄','📱','🎓','💼']
 
+/**
+ * 设置页面组件。
+ *
+ * 管理用户的分类体系：
+ * - 系统分类（🔒）：只读，不可改不可删，但可添加二级分类
+ * - 我的分类（✏️）：用户自定义的一级分类，可改可删
+ * - 支持添加/改名/删除一级和二级分类
+ * - 弹窗交互：选择 emoji 图标 + 输入分类名称
+ */
 function SettingsView({ categories, onRefresh }: { categories: CategoryL1[]; onRefresh: () => void }) {
   const [modal, setModal] = useState<null | { type: 'addL1' } | { type: 'addL2'; parentId: number } | { type: 'editL1'; id: number; name: string } | { type: 'editL2'; id: number; name: string }>(null)
   const [modalName, setModalName] = useState('')
@@ -356,8 +409,9 @@ function SettingsView({ categories, onRefresh }: { categories: CategoryL1[]; onR
       else if (modal!.type === 'editL2') await api.updateCategoryL2(modal!.id, modalName.trim())
       setModal(null)
       onRefresh()
-    } catch (e: any) {
-      alert('操作失败: ' + (e.message || '未知错误'))
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : '未知错误'
+      alert('操作失败: ' + message)
     } finally {
       setSubmitting(false)
     }
@@ -366,13 +420,19 @@ function SettingsView({ categories, onRefresh }: { categories: CategoryL1[]; onR
   const handleDeleteL1 = async (id: number, name: string) => {
     if (!confirm(`确定删除一级分类「${name}」及其所有二级分类吗？\n已记录的账目不受影响。`)) return
     try { await api.deleteCategoryL1(id); onRefresh() }
-    catch (e: any) { alert('删除失败: ' + (e.message || '未知错误')) }
+    catch (e: unknown) {
+      const message = e instanceof Error ? e.message : '未知错误'
+      alert('删除失败: ' + message)
+    }
   }
 
   const handleDeleteL2 = async (id: number, name: string) => {
     if (!confirm(`确定删除二级分类「${name}」吗？`)) return
     try { await api.deleteCategoryL2(id); onRefresh() }
-    catch (e: any) { alert('删除失败: ' + (e.message || '未知错误')) }
+    catch (e: unknown) {
+      const message = e instanceof Error ? e.message : '未知错误'
+      alert('删除失败: ' + message)
+    }
   }
 
   const toggleExpand = (id: number) => {

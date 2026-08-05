@@ -1,5 +1,5 @@
 ---
-name: 启动项目
+name: run-app
 description: 启动黑马记账应用的开发模式。当用户要求运行、启动、打开项目或预览应用时使用。
 allowed-tools: Bash
 ---

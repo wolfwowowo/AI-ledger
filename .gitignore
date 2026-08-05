@@ -2,5 +2,8 @@ node_modules/
 dist/
 out/
 data/ledger.json
+.env
 .DS_Store
 *.log
+.claude/.test-result.json
+.claude/.quality-result.json

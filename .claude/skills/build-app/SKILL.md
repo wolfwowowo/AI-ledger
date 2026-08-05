@@ -1,5 +1,5 @@
 ---
-name: 打包应用
+name: build-app
 description: 将黑马记账项目打包为桌面应用安装包。当用户要求打包、构建、发布、生成安装包时使用。
 allowed-tools: Bash
 argument-hint: <mac|win>
