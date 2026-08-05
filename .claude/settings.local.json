@@ -3,7 +3,8 @@
     "allow": [
       "Bash(git init *)",
       "Bash(git add *)",
-      "Bash(git commit -m '初始化黑马记账项目 *)"
+      "Bash(git commit -m '初始化黑马记账项目 *)",
+      "WebFetch(domain:docs.claude.com)"
     ]
   }
 }

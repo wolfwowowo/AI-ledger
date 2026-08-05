@@ -7,7 +7,14 @@
       "Bash(git fetch *)",
       "Bash(git pull *)",
       "Bash(git commit *)",
-      "Bash(git checkout *)"
+      "Bash(git checkout *)",
+      "Bash(ls -la /Users/jessica/Agent/ledger/.claude/skills/ 2>/dev/null || echo \"目录不存在\"; echo \"---\"; ls -la /Users/jessica/.claude/skills/ 2>/dev/null || echo \"用户级skills目录不存在\")",
+      "Read(//Users/jessica/.claude/**)",
+      "Bash(mkdir -p /Users/jessica/Agent/ledger/.claude/skills/run-app)",
+      "Edit(/.claude/skills/run-app/**)"
+    ],
+    "additionalDirectories": [
+      "/Users/jessica/Agent/ledger/.claude/skills"
     ]
   }
 }
