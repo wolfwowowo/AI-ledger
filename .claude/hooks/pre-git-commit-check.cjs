@@ -72,23 +72,63 @@ if (!testResult || !qualityResult) {
   const missing = [];
   if (!testResult) missing.push('单元测试标记 (.test-result.json)');
   if (!qualityResult) missing.push('质量检查标记 (.quality-result.json)');
-  deny(['⛔ 提交被拦截：缺少检查标记文件', '', ...missing.map(f => '  ✗ ' + f), '', '输入 "提交代码" 自动运行测试+质量检查'].join('\n'));
+  deny([
+    '⛔ 提交被拦截：缺少检查标记文件',
+    '',
+    '原因：',
+    ...missing.map(f => '  ✗ 找不到 ' + f),
+    '',
+    '📋 怎么办？',
+    '  在对话框中输入 提交代码，我会自动：',
+    '    ① 并行运行单元测试 + 代码质量检查',
+    '    ② 全部通过后自动帮你 commit + push',
+    '',
+    '⚡ 快捷操作：直接说"提交代码"即可。',
+  ].join('\n'));
 }
 
 // === 检查 2: 标记未过期 ===
 if (testResult.gitHead !== currentHead || qualityResult.gitHead !== currentHead) {
-  deny('⛔ 提交被拦截：检查标记已过期\n\n代码已变更，旧标记失效。请重新运行 gitcommit-agent。');
+  deny([
+    '⛔ 提交被拦截：检查标记已过期',
+    '',
+    '原因：上次检查通过后代码又有新的改动，旧标记自动失效。',
+    '',
+    '📋 怎么办？',
+    '  输入 提交代码，重新运行测试+质量检查，通过后自动提交。',
+  ].join('\n'));
 }
 
 // === 检查 3: 测试通过 ===
 if (!testResult.passed) {
   const fails = (testResult.failures || []).map(f => '  ✗ ' + f.name);
-  deny(['⛔ 提交被拦截：单元测试未通过', '', `  通过: ${testResult.passedCount}/${testResult.total}  失败: ${testResult.failed}/${testResult.total}`, ...fails, '', '请修复后重新运行 gitcommit-agent。'].join('\n'));
+  deny([
+    '⛔ 提交被拦截：单元测试未通过',
+    '',
+    `  ✅ 通过: ${testResult.passedCount} 项`,
+    `  ❌ 失败: ${testResult.failed} 项`,
+    ...(fails.length ? ['', '失败详情：', ...fails] : []),
+    '',
+    '📋 怎么办？',
+    '  1. 根据上面的失败详情修复代码',
+    '  2. 输入 提交代码 重新检查，通过后自动提交',
+  ].join('\n'));
 }
 
 // === 检查 4: 质量达标 ===
 if (!qualityResult.passed) {
-  deny(['⛔ 提交被拦截：质量检查未达标', '', `  总分: ${qualityResult.score}/10（需 ≥ 6）`, `  高危: ${qualityResult.highRiskCount} 个（需 0 个）`, '', '请修复后重新运行 gitcommit-agent。'].join('\n'));
+  const qReasons = [];
+  if (qualityResult.score < 6) qReasons.push(`  总分 ${qualityResult.score}/10（需要 ≥ 6 分）`);
+  if (qualityResult.highRiskCount > 0) qReasons.push(`  高危安全问题 ${qualityResult.highRiskCount} 个（需要 0 个）`);
+  deny([
+    '⛔ 提交被拦截：质量检查未达标',
+    '',
+    ...qReasons,
+    '',
+    '📋 怎么办？',
+    '  1. 根据质量报告修复问题',
+    '  2. 输入 提交代码 重新检查，通过后自动提交',
+  ].join('\n'));
 }
 
 // === 全部通过 ===
